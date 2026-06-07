@@ -2,21 +2,31 @@
 このファイルは MSN0822/daily-news-reports リポジトリの「直下 ROUTINE_PROMPT.md」として配置する正本指示。
 リモートルーティンのインラインプロンプト（薄いポインタ）がこれを読んで実行する。
 認証は GitHub Proxy（トークン不要・git remote set-url 不要）。本ファイルにトークンを書かないこと。
-2026-06-07 改定v2: 9カテゴリ化（08_ai-tools／09_trivia 新設）・件数は重要度ベース（上限で機械的に切らない）・
-07を社会/国際/災害に役割拡張・02/03/05/06のサブ統合・A群クエリ改善（実日付/政策ステータス語/NHK個別記事/INDEX出典URL強制/継続ウォッチ30日上限/健康の一般常識化）。
+2026-06-07 改定v2: 9カテゴリ化（08_ai-tools／09_trivia 新設）・件数は重要度ベース・
+  07を社会/国際/災害に役割拡張・02/03/05/06のサブ統合・A群クエリ改善。
+2026-06-07 改定v3: カテゴリ取得を3グループ並列実行（Task ツール）に変更。
+  グループA=01_ai-tech/08_ai-tools/09_trivia
+  グループB=02_business/03_gadgets/04_cybersecurity
+  グループC=05_health/06_entertainment/07_japan
+  親が STEP1(init)→STEP2(並列起動)→STEP3(待機)→STEP4(INDEX)→STEP5(check)→STEP6(push)
 一般常識として世間を漏れなく、かつ1人が毎朝読み切れる粒度を目的とする。
 -->
 
 
-あなたは毎朝のニュースレポートを自動作成するエージェントです。各STEPを順番に実行してください。
-作業ディレクトリは MSN0822/daily-news-reports のクローンで、git push は GitHub Proxy が認証します（トークン設定・git remote set-url は不要・URLにトークンを書かない）。
+あなたは**親エージェント**として毎朝のニュースレポートを自動作成します。
+**以下の6STEPを順番に実行してください**。カテゴリ個別の取得はサブエージェントに委譲します。
+
+実行順: STEP 1（初期設定）→ STEP 2（並列起動）→ STEP 3（待機）→ STEP 4（INDEX）→ STEP 5（品質チェック）→ STEP 6（push）
+
+作業ディレクトリは MSN0822/daily-news-reports のクローン。git push は GitHub Proxy が認証します（トークン設定・git remote set-url は不要・URLにトークンを書かない）。
+
 
 # 品質・信頼性ルール（全STEPで厳守）
 
 ## 鮮度ルール（最優先）
 
 - **48時間ゲート（発生日ベース）**: ここでの「公開日」は **その出来事が実際に起きた／初めて報じられた日**を指す。日次まとめ記事（市場サマリー・週間ランキング等）の掲載日や、配信・発売・イベントの開始予定日ではない。各項目はこの発生日を確認し、基準日(JST)から **48時間以内に発生／初報された項目だけ**を本編「本日のニュース」に採用する。48時間より古い発生日の項目は、配信／発売／開催が当日であっても本編に載せず **必ず継続ウォッチへ**回す。
-  - **例外: STEP10「話のネタ・雑学」（09_trivia）はこの48時間ゲートを適用しない**（エバーグリーンな雑学・小ネタが目的のため）。ただし「いつの情報か」を明記し、出典・確度ルールは適用する。
+  - **例外: 09_trivia はこの48時間ゲートを適用しない**（エバーグリーンな雑学・小ネタが目的のため）。ただし「いつの情報か」を明記し、出典・確度ルールは適用する。
 - **件数は重要度ベース（上限で機械的に切らない・下限でもない）**: 各サブカテゴリの件数は目安であり厳格な上限ではない。**一般常識として世間で重要・話題のニュース、事業に重要なツール更新は、目安件数を超えても採用してよい**（重要なものを件数で切り捨てない）。逆に、**重要でない・古い・低確度のニュースで件数を埋めることは禁止**する。48時間以内の新着が無いサブカテゴリは無理に埋めず「本日該当なし」と明記してよい。結果として件数は「その日に実際に起きた重要なことの数」で自然に決まる。
 - **継続ウォッチ別枠**: 48時間を超えるが継続的に重要な案件は、本編とは別に各カテゴリ末尾「継続ウォッチ（目安最大3件）」へ、公開日と《初出からの経過日数》を明記して掲載する（本編件数に数えない）。**初出から30日を超えた項目は継続ウォッチからも外す**（本編・継続とも再掲しない）。経過25日以上は《まもなくアーカイブ・N日経過》と注記する。
 - **WebSearchの最近性強制**: 各検索クエリに必ず最近性を入れる。**`past 24 hours` 等の英語フレーズは検索エンジンの時間フィルタとして機能しない自然文なので、これに頼らず実日付を使う**。英語は当日と前日の "YYYY-MM-DD"（JST午前の実行時は米国がまだ前日のため**前日分を必ず含める**）、日本語は「最新」「速報」「YYYY年MM月DD日」。可能なら検索ツールの時間範囲フィルタ（直近1〜2日）を併用する。
@@ -48,7 +58,7 @@
 
 - 出典欄に「複数メディア（検索結果）」「各社報道」「検索結果」などの**集約表現を書くことを禁止**する。
 - 一次情報源または主要媒体の**固有名（例: ロイター, CNBC, 日経, 公式リリース）＋個別記事の完全URL**を必須とする。
-- **出典URLはドメインルート・トップページ・index・一覧・カテゴリトップ（例: securityweek.com の直下、`.../news/index.html`、`.../entertainment/`）で終わってはならない。必ずその記事を一意に開ける個別URLにする。**
+- **出典URLはドメインルート・トップページ・index・一覧・カテゴリトップ（例: `https://www.securityweek.com/`、`.../news/index.html`、`.../entertainment/`）で終わってはならない。必ずその記事を一意に開ける個別URLにする。**
 - アグリゲータ・二次配信（まとめ系ニュースサイト等）を主たる根拠にしない。一次/主要媒体に当たり直す。
 - 個別記事の完全URLが取得できない項目は、本編・継続ウォッチとも**掲載しない**（推測URL・トップページURLで代用しない）。
 
@@ -91,7 +101,8 @@
 
 ---
 
-## STEP 1: 初期設定
+## 親エージェント STEP 1: 初期設定
+
 Bashで以下をすべて1回で実行する（push認証は GitHub Proxy が処理するため git remote set-url やトークン設定は不要）:
 ```
 set -euo pipefail
@@ -105,175 +116,123 @@ mkdir -p 00_Index/$YYYYMM 01_ai-tech/$YYYYMM 02_business/$YYYYMM 03_gadgets/$YYY
 rm -f 00_Index/$YYYYMM/$DATE.md 01_ai-tech/$YYYYMM/$DATE.md 02_business/$YYYYMM/$DATE.md 03_gadgets/$YYYYMM/$DATE.md 04_cybersecurity/$YYYYMM/$DATE.md 05_health/$YYYYMM/$DATE.md 06_entertainment/$YYYYMM/$DATE.md 07_japan/$YYYYMM/$DATE.md 08_ai-tools/$YYYYMM/$DATE.md 09_trivia/$YYYYMM/$DATE.md
 echo "初期設定完了: $DATE ($YYYYMM)"
 ```
-以降すべてのファイル名に上記で取得した日付とYYYYMMを使用する。
+以降すべてのファイル名に上記で取得した DATE と YYYYMM を使用する。
 git操作でエラーが発生した場合は、トークンを含むURLを出力せず「git操作でエラーが発生しました」とだけ報告して停止する。
 
-カテゴリは全9件。STEPの実行順とファイル名（dir名）は次の対応:
-STEP2→01_ai-tech / STEP3→08_ai-tools / STEP4→02_business / STEP5→03_gadgets / STEP6→04_cybersecurity / STEP7→05_health / STEP8→06_entertainment / STEP9→07_japan / STEP10→09_trivia / STEP11→00_Index。
+---
+
+## 親エージェント STEP 2: カテゴリ取得（3グループ並列実行）
+
+STEP 1 で取得した DATE と YYYYMM を使い、**Task ツールを3回連続で呼び出してサブエージェントを同時起動する**。
+重要: 3つの Task 呼び出しはそれぞれ完了を待たず即座に次の呼び出しへ進む。全て起動し終えてから STEP 3 へ移る。
+3つの task_id を記録する（STEP 3 で使用）。
 
 ---
 
-## STEP 2:【AI・テクノロジー】→ 01_ai-tech
-AI/テック業界全体を第三者視点で把握する。WebSearchを以下を基本に、**必ず実日付（当日＋前日）または「最新」「速報」を付けて**実行（past 24 hours等の自然文に頼らない）。重要な数値・効果主張がある場合はWebFetchで公式ページを確認する:
-- AI Big Tech startup news {当日YYYY-MM-DD} / AI Big Tech news {前日YYYY-MM-DD}
-- AI regulation policy (enacted OR signed into law OR 成立 OR 施行) {YYYY-MM-DD}
-- AI 人工知能 ビッグテック スタートアップ 最新ニュース {YYYY年MM月DD日}
-- AI 規制 政策 (成立 OR 施行) {YYYY年MM月DD日}
+### グループ A のプロンプト（Task ツールの prompt パラメータに渡す文字列）:
 
-Writeツールで `01_ai-tech/{YYYYMM}/{日付}.md` に保存。**48時間以内の新着で重要なもの（件数は目安・重要なら目安超え可・古い/低確度で埋めない・ゼロなら「本日該当なし」）**。各ニュースに出典(固有名+個別記事URL)・公開日・確度・注意点。政策項目は法的ステータスを公式確認。48時間超の重要案件は末尾「継続ウォッチ」に経過日数付きで（30日超は載せない）:
-# AI・テクノロジー ニュースレポート {YYYY}年{MM}月{DD}日
-基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
-## AI・人工知能
-## ビッグテック
-## スタートアップ
-## 政策・規制（国内外）
-## 継続ウォッチ（48時間超・目安最大3件・経過日数明記）
----
-生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+あなたはニュースレポート作成エージェント（グループA担当）です。
 
----
+まず、このリポジトリ直下の ROUTINE_PROMPT.md を Read ツールで読み込む。
+「品質・信頼性ルール」セクション全体と、末尾の「サブエージェント用 カテゴリ別指示」セクションを把握してから作業を開始する。
 
-## STEP 3:【AIツール・開発】→ 08_ai-tools
-あなた（利用者）が実際に使うAIツールの実務情報。WebSearch（実日付・固有名詞優先）:
-- Claude OR Anthropic (update OR released OR pricing OR outage) {当日} / {前日}
-- Cursor OR "GitHub Copilot" OR Codex OR "Gemini CLI" (update OR feature OR release) {当日} / {前日}
-- Claude OR Cursor OR Copilot 新機能 アップデート 料金 {YYYY年MM月DD日}
-- AI coding agent OR AI writing tool OR image video generation tool news {YYYY-MM-DD}
+次に Bash で日付を取得する:
+  DATE=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+  YYYYMM=$(TZ=Asia/Tokyo date +%Y%m)
+  echo "$DATE $YYYYMM"
 
-`08_ai-tools/{YYYYMM}/{日付}.md` に保存。**重要なツール更新は件数目安を超えても採用・古い/低確度で埋めない・ゼロなら本日該当なし**。各項目に出典(固有名+個別記事URL)・公開日・確度・注意点。
-**01_ai-tech との重複禁止**: 01=AI業界全体（モデル研究・ビッグテック戦略・資金調達・規制）、08=実際に使う道具の実務（機能追加・価格・障害・使い方）。同一ニュースは両方に載せず、ツール実務寄りは08に置く。
-# AIツール・開発 レポート {YYYY}年{MM}月{DD}日
-基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
-## Claude・Anthropic（API・モデル・価格・Claude Code新機能・障害情報）
-## AIツール全般（コーディング/画像・動画・音声/ライティング/エージェント/活用事例）
-## 継続ウォッチ（48時間超・目安最大3件・経過日数明記）
----
-生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+以下の3カテゴリを順番に実行する（詳細指示は ROUTINE_PROMPT.md の「サブエージェント用 カテゴリ別指示」を参照）:
+  1. カテゴリ 01_ai-tech → 保存先: 01_ai-tech/$YYYYMM/$DATE.md
+  2. カテゴリ 08_ai-tools → 保存先: 08_ai-tools/$YYYYMM/$DATE.md
+  3. カテゴリ 09_trivia → 保存先: 09_trivia/$YYYYMM/$DATE.md
+
+注意:
+- git commit / git push は行わない（親エージェントが STEP 6 で一括実施）
+- STEP 1 の init（mkdir/rm）は親が済ませているため不要
+- 「サブエージェント用 カテゴリ別指示」に各カテゴリの検索クエリ・フォーマット・禁止事項が書かれている
+
+3ファイル作成完了後、次の形式で報告する:
+「グループA完了: {DATE}. 01_ai-tech:{N}件（うち継続ウォッチ{M}件）, 08_ai-tools:{N}件, 09_trivia:{N}件」
+```
 
 ---
 
-## STEP 4:【ビジネス・経済】→ 02_business
-WebSearch（実日付）:
-- stock market Nikkei Dow economy corporate news {当日} / {前日}
-- 株式 為替 企業 日本経済 世界経済 最新ニュース {YYYY年MM月DD日}
+### グループ B のプロンプト（Task ツールの prompt パラメータに渡す文字列）:
 
-`02_business/{YYYYMM}/{日付}.md` に保存。**重要なもの優先・古い/低確度で埋めない・ゼロなら本日該当なし**。各ニュースに出典(固有名+個別記事URL)・公開日・確度・注意点。市場は指数と方向だけ簡潔に（個別銘柄分析はしない）。市場予測は「可能性」「見方」と表現:
-# ビジネス・経済 ニュースレポート {YYYY}年{MM}月{DD}日
-基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
-## 景気・市場の動き（株式・為替・日本経済マクロ）
-## 企業・産業
-## 世界経済
-## 継続ウォッチ（48時間超・目安最大3件）
----
-生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+あなたはニュースレポート作成エージェント（グループB担当）です。
 
----
+まず、このリポジトリ直下の ROUTINE_PROMPT.md を Read ツールで読み込む。
+「品質・信頼性ルール」セクション全体と、末尾の「サブエージェント用 カテゴリ別指示」セクションを把握してから作業を開始する。
 
-## STEP 5:【ガジェット・新製品】→ 03_gadgets
-WebSearch（実日付・記事タイトルの実際の語に合わせる）:
-- (announced OR launches OR released OR hands-on) (gadget OR device OR wearable OR "smart home") {当日} / {前日}
-- ガジェット 新製品 発表 {YYYY年MM月DD日}
+次に Bash で日付を取得する:
+  DATE=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+  YYYYMM=$(TZ=Asia/Tokyo date +%Y%m)
+  echo "$DATE $YYYYMM"
 
-`03_gadgets/{YYYYMM}/{日付}.md` に保存（楽しいトーンで）。**重要なもの優先・古い発表は本編に入れず継続ウォッチ・ゼロなら本日該当なし**。クラウドファンディングは公式URLをWebFetchで確認できなければ「掲載見送り」:
-# ガジェット・新製品 ニュースレポート {YYYY}年{MM}月{DD}日
-基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
-## 注目の新製品・ガジェット（スマートホーム・ウェアラブル・新発売）
-## クラウドファンディング注目品
-## 継続ウォッチ（48時間超・目安最大3件）
----
-生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+以下の3カテゴリを順番に実行する（詳細指示は ROUTINE_PROMPT.md の「サブエージェント用 カテゴリ別指示」を参照）:
+  1. カテゴリ 02_business → 保存先: 02_business/$YYYYMM/$DATE.md
+  2. カテゴリ 03_gadgets → 保存先: 03_gadgets/$YYYYMM/$DATE.md
+  3. カテゴリ 04_cybersecurity → 保存先: 04_cybersecurity/$YYYYMM/$DATE.md
+
+注意:
+- git commit / git push は行わない（親エージェントが STEP 6 で一括実施）
+- STEP 1 の init（mkdir/rm）は親が済ませているため不要
+- 「サブエージェント用 カテゴリ別指示」に各カテゴリの検索クエリ・フォーマット・禁止事項が書かれている
+
+3ファイル作成完了後、次の形式で報告する:
+「グループB完了: {DATE}. 02_business:{N}件（うち継続ウォッチ{M}件）, 03_gadgets:{N}件, 04_cybersecurity:{N}件」
+```
 
 ---
 
-## STEP 6:【サイバーセキュリティ】→ 04_cybersecurity
-WebSearch（実日付）:
-- cybersecurity breach ransomware vulnerability news {当日} / {前日}
-- サイバー攻撃 情報漏洩 セキュリティ 最新ニュース {YYYY年MM月DD日}
+### グループ C のプロンプト（Task ツールの prompt パラメータに渡す文字列）:
 
-`04_cybersecurity/{YYYYMM}/{日付}.md` に保存。**重要なもの優先・ゼロなら本日該当なし**。CVE番号・影響製品・対策が確認できる場合は必ず記載:
-# サイバーセキュリティ ニュースレポート {YYYY}年{MM}月{DD}日
-基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
-## サイバー攻撃・情報漏洩
-## ランサムウェア・脆弱性
-## セキュリティトレンド・政策
-## 継続ウォッチ（48時間超・目安最大3件）
----
-生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+あなたはニュースレポート作成エージェント（グループC担当）です。
 
----
+まず、このリポジトリ直下の ROUTINE_PROMPT.md を Read ツールで読み込む。
+「品質・信頼性ルール」セクション全体と、末尾の「サブエージェント用 カテゴリ別指示」セクションを把握してから作業を開始する。
 
-## STEP 7:【健康・医療・バイオテック】→ 05_health
-一般常識として世間が知るべき健康・医療ニュースを広く拾う。WebSearch（実日付）:
-- health medical (recall OR outbreak OR approval OR study) news {当日} / {前日}
-- 健康 医療 ニュース 話題 {YYYY年MM月DD日}
-- FDA approval OR PMDA 承認 {YYYY-MM-DD}
+次に Bash で日付を取得する:
+  DATE=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+  YYYYMM=$(TZ=Asia/Tokyo date +%Y%m)
+  echo "$DATE $YYYYMM"
 
-`05_health/{YYYYMM}/{日付}.md` に保存。**世間で話題の重要な健康・医療ニュース（大型リコール・感染症・話題の研究・大きな医療事故・健康トレンド）を拾う。48時間以内の新着優先・古い記事で埋めない・新着が無ければ「本日該当なし」と堂々と記録**。効果・改善率は論文・規制当局・主要医学メディアで確認できる場合のみ・研究段階を明記（「治る」「予防できる」と断定しない）:
-# 健康・医療・バイオテック ニュースレポート {YYYY}年{MM}月{DD}日
-基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
-## 医療・ヘルスケア
-## バイオ・製薬・新薬
-## 継続ウォッチ（48時間超・目安最大3件）
----
-生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+以下の3カテゴリを順番に実行する（詳細指示は ROUTINE_PROMPT.md の「サブエージェント用 カテゴリ別指示」を参照）:
+  1. カテゴリ 05_health → 保存先: 05_health/$YYYYMM/$DATE.md
+  2. カテゴリ 06_entertainment → 保存先: 06_entertainment/$YYYYMM/$DATE.md
+  3. カテゴリ 07_japan → 保存先: 07_japan/$YYYYMM/$DATE.md
+
+注意:
+- git commit / git push は行わない（親エージェントが STEP 6 で一括実施）
+- STEP 1 の init（mkdir/rm）は親が済ませているため不要
+- 「サブエージェント用 カテゴリ別指示」に各カテゴリの検索クエリ・フォーマット・禁止事項が書かれている
+
+3ファイル作成完了後、次の形式で報告する:
+「グループC完了: {DATE}. 05_health:{N}件（うち継続ウォッチ{M}件）, 06_entertainment:{N}件, 07_japan:{N}件」
+```
 
 ---
 
-## STEP 8:【エンタメ・ゲーム・芸能】→ 06_entertainment
-WebSearch（実日付）:
-- gaming entertainment streaming viral trend news {当日} / {前日}
-- ゲーム エンタメ 配信 SNS 話題 トレンド {YYYY年MM月DD日}
-- 日本 芸能 話題 {YYYY年MM月DD日}
+## 親エージェント STEP 3: サブエージェント完了待ち
 
-`06_entertainment/{YYYYMM}/{日付}.md` に保存（楽しいトーンで）。**重要・話題のもの優先・公開日が確認できない項目は載せない・ゼロなら本日該当なし**。「ネット・SNSで話題」を主軸に。芸能は結婚/訃報/大型スキャンダル級のみ（ゴシップ網羅はしない）。スポーツは大きな話題（記録・日本人選手の活躍等）のときだけ薄く:
-# エンタメ・ゲーム・芸能 ニュースレポート {YYYY}年{MM}月{DD}日
-基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
-## ネット・SNSで話題
-## ゲーム・エンタメ・芸能
-## 継続ウォッチ（48時間超・目安最大3件）
----
-生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+STEP 2 で記録した **task_id_A・task_id_B・task_id_C** を TaskGet ツールで順番に確認する。
+3つ全ての status が `completed` になるまで繰り返す（まだ `running` なら1〜2分後に再確認）。
+
+いずれかが `failed` になった場合:
+- TaskOutput でエラー内容を取得・確認する
+- 「グループ{X}でエラーが発生しました: {内容}。プッシュを中止します」と報告して停止する
+  （品質が保証されない状態では STEP 4〜6 を実行しない）
 
 ---
 
-## STEP 9:【社会・国際・災害（日本＋世界）】→ 07_japan
-国内の政治・社会に加え、一般常識として欠かせない国際情勢と災害・重大事件を拾う。WebSearch（実日付・NHKは個別記事URL）:
-- Japan politics government policy news {当日} / {前日}
-- 日本 政治 政策 国会 閣議 {YYYY年MM月DD日} -inurl:genre
-- (大規模災害 OR 重大事件 OR 特別警報 OR 台風) {YYYY年MM月DD日}
-- world news (politics OR conflict OR election OR summit) {当日} / {前日}
+## 親エージェント STEP 4: 全体インデックス作成 → 00_Index
 
-`07_japan/{YYYYMM}/{日付}.md` に保存。**重要なもの優先・ゼロなら本日該当なし**。政治的評価は避け主張と事実を分ける。政策項目は法的ステータスを公式確認。**NHK出典は k10 で始まる個別記事URLを使い newsweb/・genre/ のカテゴリトップを出典にしない**:
-# 社会・国際・災害 ニュースレポート {YYYY}年{MM}月{DD}日
-基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
-## 政治・行政の動き
-## 社会・事件・災害
-## 国際情勢
-## 継続ウォッチ（48時間超・目安最大3件）
----
-生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+STEP 3 で完了した9カテゴリのファイルを参照し、全項目（本編＋継続ウォッチ）を1件1文で網羅した `00_Index/{YYYYMM}/{日付}.md` を Write ツールで作成する。**各項目に、対応する本編項目と同じ固有出典名＋個別記事URLを必ず引き継ぎ、確度を付ける**（INDEXだけ出典・URLが欠落してはならない）。各カテゴリ見出しから対応ファイルへの相対リンクも付す。継続ウォッチ分は「（継続・N日経過）」と明記し、経過日数が確定できない項目は載せない:
 
----
-
-## STEP 10:【話のネタ・雑学】→ 09_trivia
-ニュースでは大きく扱われないが「人に話したくなる」面白い雑学・小ネタ・意外な発見。**このカテゴリは48時間ゲートを適用しない（エバーグリーン可）**。WebSearch:
-- interesting study OR surprising fact OR research finding {YYYY-MM}
-- 面白い 雑学 OR 意外な事実 OR 研究 話題 {YYYY年MM月}
-- weird OR unusual OR fascinating news {当日} / {前日}
-- ランキング OR 統計 意外 {YYYY年MM月}
-
-推奨ソースは速報系でなく解説・面白系（ナショジオ/GIGAZINE/ねとらぼ/カラパイア/Reddit TIL/大学・研究機関プレス/統計サイト等）。`09_trivia/{YYYYMM}/{日付}.md` に保存（楽しいトーンで）。面白さ・意外性が基準。**ただし出典(固有名+個別記事URL)は必須・断定/誇張禁止・「いつの情報か」を明記**（出所不明の与太話は載せない）。健康/医療系の雑学は効果を断定しない:
-# 話のネタ・雑学 {YYYY}年{MM}月{DD}日
-基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
-## へぇ系（雑学・研究・発見）
-## 世の中の面白い動き（珍製品・海外の変わった話・意外な統計）
----
-生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
-
----
-
-## STEP 11:【全体網羅インデックス作成】→ 00_Index
-STEP 2〜10の全項目（本編＋継続ウォッチ）を1件1文で網羅し `00_Index/{YYYYMM}/{日付}.md` に保存。**各項目に、対応する本編項目と同じ固有出典名＋個別記事URLを必ず引き継ぎ、確度を付ける**（INDEXだけ出典・URLが欠落してはならない）。各カテゴリ見出しから対応ファイル（例: ../01_ai-tech/{YYYYMM}/{日付}.md、../08_ai-tools/...、../09_trivia/...）への相対リンクも付す。継続ウォッチ分は「（継続・N日経過）」と明記し、経過日数が確定できない項目は載せない:
+```
 # 📰 今日のニュース全件まとめ {YYYY}年{MM}月{DD}日
 基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
 
@@ -283,12 +242,13 @@ STEP 2〜10の全項目（本編＋継続ウォッチ）を1件1文で網羅し 
 （各カテゴリの本編全件＋継続ウォッチを掲載・各項目に出典名＋URL＋確度）
 ---
 生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
 
 ---
 
-## STEP 12: 出力前チェック
+## 親エージェント STEP 5: 出力前チェック
 
-まず**全カテゴリの出典URLを1件ずつ目視点検**し、(a)ドメインルート (b)カテゴリトップ・一覧（例: /politics/・/entertainment/・/newsweb/・/genre/） (c)index系（index.html 等） で終わるURLは、その記事の個別URLに差し替えるか、取得できなければ該当項目を掲載見送りにする。カテゴリトップ型は下のbashでは拾えないため**必ず目視で除く**（NHK・日経・Oricon等のセクションURLをそのまま出典にしない）。
+まず**全カテゴリの出典URLを1件ずつ目視点検**し、(a)ドメインルート (b)カテゴリトップ・一覧（例: `/politics/`・`/entertainment/`・`/newsweb/`・`/genre/`） (c)index系（`index.html` 等） で終わるURLは、その記事の個別URLに差し替えるか、取得できなければ該当項目を掲載見送りにする。カテゴリトップ型は下のbashでは拾えないため**必ず目視で除く**（NHK・日経・Oricon等のセクションURLをそのまま出典にしない）。
 
 次にBashで以下を1回実行する:
 ```
@@ -300,6 +260,7 @@ for f in "${ALL[@]}"; do
   [ -s "$f" ] || { echo "ERROR: $f が存在しないか空です"; exit 1; }
 done
 echo "ファイル存在チェック完了"
+# 48時間ニュース8カテゴリ（09_trivia除く）: 基準日必須・本日該当なしでなければ出典/確度必須
 NEWS=("01_ai-tech/$YYYYMM/$DATE.md" "08_ai-tools/$YYYYMM/$DATE.md" "02_business/$YYYYMM/$DATE.md" "03_gadgets/$YYYYMM/$DATE.md" "04_cybersecurity/$YYYYMM/$DATE.md" "05_health/$YYYYMM/$DATE.md" "06_entertainment/$YYYYMM/$DATE.md" "07_japan/$YYYYMM/$DATE.md")
 for f in "${NEWS[@]}"; do
   grep -q "基準日:" "$f" || { echo "ERROR: $f に基準日表記がありません"; exit 1; }
@@ -308,20 +269,24 @@ for f in "${NEWS[@]}"; do
     grep -q "確度:" "$f" || { echo "ERROR: $f に確度表記がありません"; exit 1; }
   fi
 done
+# 09_trivia は出典必須（48h/基準日は課さない＝エバーグリーン許容）
 grep -q "出典:" "09_trivia/$YYYYMM/$DATE.md" || { echo "ERROR: 09_trivia に出典表記がありません"; exit 1; }
+# 出典URLがドメインルート/index系で終わる項目を検出（個別記事URL必須・全カテゴリ）
 for f in "${ALL[@]}"; do
   if grep -Eq '\]\(https?://([^/)]+/?|[^)]*/index\.(html?|php))\)' "$f"; then echo "ERROR: $f にドメインルート/indexページのみのURLがあります（個別記事URLに直すか掲載見送り）"; exit 1; fi
 done
+# INDEXに固有出典名＋個別記事URLが引き継がれているか
 grep -q "出典:" "00_Index/$YYYYMM/$DATE.md" || { echo "ERROR: INDEXに出典(固有名+URL)が引き継がれていません"; exit 1; }
 grep -Eq 'https?://' "00_Index/$YYYYMM/$DATE.md" || { echo "ERROR: INDEXに個別記事URLが引き継がれていません"; exit 1; }
 echo "品質チェック完了"
 ```
-チェックに失敗した場合はGitHubにプッシュしない。**エラーが出た項目を修正（発生日が48h超なら継続ウォッチへ移動、トップページ/ドメインルートURLは個別記事URLへ差し替え、取得できなければ該当項目を削除、INDEXの出典・URL欠落は補完）し、STEP12を再実行する**。2回修正しても通らない項目は削除し、STEP12通過後に push する。トークンを含むURLは出力しない。
+チェックに失敗した場合はGitHubにプッシュしない。**エラーが出た項目を修正（発生日が48h超なら継続ウォッチへ移動、トップページ/ドメインルートURLは個別記事URLへ差し替え、取得できなければ該当項目を削除、INDEXの出典・URL欠落は補完）し、STEP5を再実行する**。2回修正しても通らない項目は削除し、STEP5通過後に push する。トークンを含むURLは出力しない。
 
 ---
 
-## STEP 13: GitHubにプッシュ
-全ファイルが保存でき、STEP 12のチェックに成功したら、Bashで以下を1回だけ実行する（GitHub Proxy が認証・トークン不要）:
+## 親エージェント STEP 6: GitHubにプッシュ
+
+全ファイルが保存でき、STEP 5のチェックに成功したら、Bashで以下を1回だけ実行する（GitHub Proxy が認証・トークン不要）:
 ```
 git add -A && git commit -m "report: 全カテゴリ+インデックス $(TZ=Asia/Tokyo date +%Y-%m-%d)" && git push origin main
 ```
@@ -331,8 +296,213 @@ git add -A && git commit -m "report: 全カテゴリ+インデックス $(TZ=Asi
 成功した場合は以下の形式で報告してください:
 「全カテゴリのレポート＋インデックス作成・プッシュ完了」
 - 日付: YYYY-MM-DD
+- 並列実行: グループA/B/C の完了時刻（HH:MM）
 - 本日該当なしにしたサブカテゴリ: なし / あり（概要）
 - 継続ウォッチに回した件数: N件
 - 30日超で除外した継続ウォッチ: なし / あり
 - 低確度・未確認として扱ったニュース: なし / あり（概要）
 - 掲載見送りにした商品: なし / あり（概要）
+
+---
+
+# サブエージェント用 カテゴリ別指示
+
+> **親エージェントはこのセクションを実行しない。**
+> **サブエージェントのみが参照・実行する。**
+> 各カテゴリの検索クエリ・フォーマット・品質基準はこのセクションに書かれている。
+> 「親エージェント STEP 1〜6」は無視し、自分に割り当てられたカテゴリだけを実行すること。
+
+---
+
+### カテゴリ 01_ai-tech（AI・テクノロジー）
+
+AI/テック業界全体を第三者視点で把握する。WebSearchを以下を基本に、**必ず実日付（当日＋前日）または「最新」「速報」を付けて**実行（`past 24 hours`等の自然文に頼らない）。重要な数値・効果主張がある場合はWebFetchで公式ページを確認する:
+- "AI Big Tech startup news {YYYY-MM-DD}" OR "AI Big Tech news {前日YYYY-MM-DD}"
+- "AI regulation policy (\"enacted\" OR \"signed into law\" OR \"成立\" OR \"施行\") {YYYY-MM-DD}"
+- "AI 人工知能 ビッグテック スタートアップ 最新ニュース {YYYY年MM月DD日}"
+- "AI 規制 政策 (\"成立\" OR \"施行\") {YYYY年MM月DD日}"
+
+Writeツールで `01_ai-tech/{YYYYMM}/{日付}.md` に保存。**48時間以内の新着で重要なもの（件数は目安・重要なら目安超え可・古い/低確度で埋めない・ゼロなら「本日該当なし」）**。各ニュースに出典(固有名+個別記事URL)・公開日・確度・注意点。政策項目は法的ステータスを公式確認（上記「政策・法令ニュースの確認」）。48時間超の重要案件は末尾「継続ウォッチ」に経過日数付きで（30日超は載せない）:
+
+```
+# AI・テクノロジー ニュースレポート {YYYY}年{MM}月{DD}日
+基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
+## AI・人工知能
+## ビッグテック
+## スタートアップ
+## 政策・規制（国内外）
+## 継続ウォッチ（48時間超・目安最大3件・経過日数明記）
+---
+生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+
+---
+
+### カテゴリ 08_ai-tools（AIツール・開発）
+
+あなた（利用者）が実際に使うAIツールの実務情報。WebSearch（実日付・固有名詞優先）:
+- "Claude OR Anthropic (update OR released OR pricing OR outage) {YYYY-MM-DD}" OR "{前日}"
+- "Cursor OR \"GitHub Copilot\" OR Codex OR \"Gemini CLI\" (update OR feature OR release) {YYYY-MM-DD}" OR "{前日}"
+- "Claude OR Cursor OR Copilot 新機能 アップデート 料金 {YYYY年MM月DD日}"
+- "AI coding agent OR AI writing tool OR image video generation tool news {YYYY-MM-DD}"
+
+`08_ai-tools/{YYYYMM}/{日付}.md` に保存。**重要なツール更新は件数目安を超えても採用・古い/低確度で埋めない・ゼロなら本日該当なし**。各項目に出典(固有名+個別記事URL)・公開日・確度・注意点。
+**01_ai-tech との重複禁止**: 01=AI業界全体（モデル研究・ビッグテック戦略・資金調達・規制）、08=実際に使う道具の実務（機能追加・価格・障害・使い方）。同一ニュースは両方に載せず、ツール実務寄りは08に置く。
+
+```
+# AIツール・開発 レポート {YYYY}年{MM}月{DD}日
+基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
+## Claude・Anthropic（API・モデル・価格・Claude Code新機能・障害情報）
+## AIツール全般（コーディング/画像・動画・音声/ライティング/エージェント/活用事例）
+## 継続ウォッチ（48時間超・目安最大3件・経過日数明記）
+---
+生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+
+---
+
+### カテゴリ 02_business（ビジネス・経済）
+
+WebSearch（実日付）:
+- "stock market Nikkei Dow economy corporate news {YYYY-MM-DD}" OR "{前日}"
+- "株式 為替 企業 日本経済 世界経済 最新ニュース {YYYY年MM月DD日}"
+
+`02_business/{YYYYMM}/{日付}.md` に保存。**重要なもの優先・古い/低確度で埋めない・ゼロなら本日該当なし**。各ニュースに出典(固有名+個別記事URL)・公開日・確度・注意点。市場は指数と方向だけ簡潔に（個別銘柄分析はしない）。市場予測は「可能性」「見方」と表現:
+
+```
+# ビジネス・経済 ニュースレポート {YYYY}年{MM}月{DD}日
+基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
+## 景気・市場の動き（株式・為替・日本経済マクロ）
+## 企業・産業
+## 世界経済
+## 継続ウォッチ（48時間超・目安最大3件）
+---
+生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+
+---
+
+### カテゴリ 03_gadgets（ガジェット・新製品）
+
+WebSearch（実日付・記事タイトルの実際の語に合わせる）:
+- "(announced OR launches OR released OR hands-on) (gadget OR device OR wearable OR \"smart home\") {YYYY-MM-DD}" OR "{前日}"
+- "ガジェット 新製品 発表 {YYYY年MM月DD日}"
+
+`03_gadgets/{YYYYMM}/{日付}.md` に保存（楽しいトーンで）。**重要なもの優先・古い発表は本編に入れず継続ウォッチ・ゼロなら本日該当なし**。クラウドファンディングは公式URLをWebFetchで確認できなければ「掲載見送り」:
+
+```
+# ガジェット・新製品 ニュースレポート {YYYY}年{MM}月{DD}日
+基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
+## 注目の新製品・ガジェット（スマートホーム・ウェアラブル・新発売）
+## クラウドファンディング注目品
+## 継続ウォッチ（48時間超・目安最大3件）
+---
+生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+
+---
+
+### カテゴリ 04_cybersecurity（サイバーセキュリティ）
+
+WebSearch（実日付）:
+- "cybersecurity breach ransomware vulnerability news {YYYY-MM-DD}" OR "{前日}"
+- "サイバー攻撃 情報漏洩 セキュリティ 最新ニュース {YYYY年MM月DD日}"
+
+`04_cybersecurity/{YYYYMM}/{日付}.md` に保存。**重要なもの優先・ゼロなら本日該当なし**。CVE番号・影響製品・対策が確認できる場合は必ず記載:
+
+```
+# サイバーセキュリティ ニュースレポート {YYYY}年{MM}月{DD}日
+基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
+## サイバー攻撃・情報漏洩
+## ランサムウェア・脆弱性
+## セキュリティトレンド・政策
+## 継続ウォッチ（48時間超・目安最大3件）
+---
+生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+
+---
+
+### カテゴリ 05_health（健康・医療・バイオテック）
+
+一般常識として世間が知るべき健康・医療ニュースを広く拾う。WebSearch（実日付）:
+- "health medical (recall OR outbreak OR approval OR study) news {YYYY-MM-DD}" OR "{前日}"
+- "健康 医療 ニュース 話題 {YYYY年MM月DD日} site:nhk.or.jp OR site:yomiuri.co.jp"
+- "FDA approval OR PMDA 承認 {YYYY-MM-DD}"
+
+`05_health/{YYYYMM}/{日付}.md` に保存。**世間で話題の重要な健康・医療ニュース（大型リコール・感染症・話題の研究・大きな医療事故・健康トレンド）を拾う。48時間以内の新着優先・古い記事で埋めない・新着が無ければ「本日該当なし」と堂々と記録**。効果・改善率は論文・規制当局・主要医学メディアで確認できる場合のみ・研究段階を明記（「治る」「予防できる」と断定しない）:
+
+```
+# 健康・医療・バイオテック ニュースレポート {YYYY}年{MM}月{DD}日
+基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
+## 医療・ヘルスケア
+## バイオ・製薬・新薬
+## 継続ウォッチ（48時間超・目安最大3件）
+---
+生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+
+---
+
+### カテゴリ 06_entertainment（エンタメ・ゲーム・芸能）
+
+WebSearch（実日付）:
+- "gaming entertainment streaming viral trend news {YYYY-MM-DD}" OR "{前日}"
+- "ゲーム エンタメ 配信 SNS 話題 トレンド {YYYY年MM月DD日}"
+- "日本 芸能 話題 {YYYY年MM月DD日}"
+
+`06_entertainment/{YYYYMM}/{日付}.md` に保存（楽しいトーンで）。**重要・話題のもの優先・公開日が確認できない項目は載せない・ゼロなら本日該当なし**。「ネット・SNSで話題」を主軸に。芸能は結婚/訃報/大型スキャンダル級のみ（ゴシップ網羅はしない）。スポーツは大きな話題（記録・日本人選手の活躍等）のときだけ薄く:
+
+```
+# エンタメ・ゲーム・芸能 ニュースレポート {YYYY}年{MM}月{DD}日
+基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
+## ネット・SNSで話題
+## ゲーム・エンタメ・芸能
+## 継続ウォッチ（48時間超・目安最大3件）
+---
+生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+
+---
+
+### カテゴリ 07_japan（社会・国際・災害）
+
+国内の政治・社会に加え、一般常識として欠かせない国際情勢と災害・重大事件を拾う。WebSearch（実日付・NHKは個別記事URL）:
+- "Japan politics government policy news {YYYY-MM-DD}" OR "{前日}"
+- "日本 政治 政策 国会 閣議 {YYYY年MM月DD日} -inurl:genre"
+- "(大規模災害 OR 重大事件 OR 特別警報 OR 台風) {YYYY年MM月DD日}"
+- "world news (politics OR conflict OR election OR summit) {YYYY-MM-DD}" OR "{前日}"
+
+`07_japan/{YYYYMM}/{日付}.md` に保存。**重要なもの優先・ゼロなら本日該当なし**。政治的評価は避け主張と事実を分ける。政策項目は法的ステータスを公式確認（上記ルール）。**NHK出典は k10 で始まる個別記事URLを使い `newsweb/`・`genre/` のカテゴリトップを出典にしない**:
+
+```
+# 社会・国際・災害 ニュースレポート {YYYY}年{MM}月{DD}日
+基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
+## 政治・行政の動き
+## 社会・事件・災害
+## 国際情勢
+## 継続ウォッチ（48時間超・目安最大3件）
+---
+生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
+
+---
+
+### カテゴリ 09_trivia（話のネタ・雑学）
+
+ニュースでは大きく扱われないが「人に話したくなる」面白い雑学・小ネタ・意外な発見。**このカテゴリは48時間ゲートを適用しない（エバーグリーン可）**。WebSearch:
+- "interesting study OR surprising fact OR research finding {YYYY-MM}"
+- "面白い 雑学 OR 意外な事実 OR 研究 話題 {YYYY年MM月}"
+- "weird OR unusual OR fascinating news {YYYY-MM-DD}" OR "{前日}"
+- "ランキング OR 統計 意外 {YYYY年MM月}"
+
+推奨ソースは速報系でなく解説・面白系（ナショジオ/GIGAZINE/ねとらぼ/カラパイア/Reddit TIL/大学・研究機関プレス/統計サイト等）。`09_trivia/{YYYYMM}/{日付}.md` に保存（楽しいトーンで）。面白さ・意外性が基準。**ただし出典(固有名+個別記事URL)は必須・断定/誇張禁止・「いつの情報か」を明記**（出所不明の与太話は載せない）。健康/医療系の雑学は効果を断定しない:
+
+```
+# 話のネタ・雑学 {YYYY}年{MM}月{DD}日
+基準日: {YYYY-MM-DD}(JST) / 収集時刻: {HH:MM}
+## へぇ系（雑学・研究・発見）
+## 世の中の面白い動き（珍製品・海外の変わった話・意外な統計）
+---
+生成日時: {日付} 09:00 JST | Claude Code 自動エージェント
+```
