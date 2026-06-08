@@ -1,7 +1,7 @@
 <!--
 このファイルは MSN0822/daily-news-reports リポジトリの「直下 ROUTINE_PROMPT.md」として配置する正本指示。
 リモートルーティンのインラインプロンプト（薄いポインタ）がこれを読んで実行する。
-認証は GitHub Proxy（トークン不要・git remote set-url 不要）。本ファイルにトークンを書かないこと。
+main反映は GitHub MCP の push_files で直接行う（git push / gh / 作業ブランチ / PR は使わない）。本ファイルにトークンを書かないこと。
 2026-06-07 改定v2: 9カテゴリ化（08_ai-tools／09_trivia 新設）・件数は重要度ベース（上限で機械的に切らない）・
 07を社会/国際/災害に役割拡張・02/03/05/06のサブ統合・A群クエリ改善（実日付/政策ステータス語/NHK個別記事/INDEX出典URL強制/継続ウォッチ30日上限/健康の一般常識化）。
 一般常識として世間を漏れなく、かつ1人が毎朝読み切れる粒度を目的とする。
@@ -9,7 +9,7 @@
 
 
 あなたは毎朝のニュースレポートを自動作成するエージェントです。各STEPを順番に実行してください。
-作業ディレクトリは MSN0822/daily-news-reports のクローンで、最終STEPで gh pr merge により main へ反映します（トークン設定・git remote set-url は不要・URLにトークンを書かない）。
+作業ディレクトリは MSN0822/daily-news-reports のクローンで、最終STEPで GitHub MCP の push_files を使い main へ直接反映します（git push / gh / 作業ブランチ作成 / PR作成は使わない）。
 
 # 品質・信頼性ルール（全STEPで厳守）
 
@@ -92,7 +92,7 @@
 ---
 
 ## STEP 1: 初期設定
-Bashで以下をすべて1回で実行する（push認証は GitHub Proxy が処理するため git remote set-url やトークン設定は不要）:
+Bashで以下をすべて1回で実行する（main反映は GitHub MCP の push_files で直接行うため git remote set-url やトークン設定は不要）:
 ```
 set -euo pipefail
 DATE=$(TZ=Asia/Tokyo date +%Y-%m-%d)
@@ -320,25 +320,36 @@ echo "品質チェック完了"
 
 ---
 
-## STEP 13: GitHubにプッシュ
-全ファイルが保存でき、STEP 12のチェックに成功したら、Bashで以下を1回だけ実行する（gh pr merge により main へ反映・トークン不要）:
-```
-set -euo pipefail
-DATE=$(TZ=Asia/Tokyo date +%Y-%m-%d)
-git add -A
-git commit -m "report: 全カテゴリ+インデックス $DATE"
-git push origin main || true
-sleep 8
-PR=$(gh pr list --base main --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
-if [ -n "$PR" ]; then gh pr merge "$PR" --merge --delete-branch; echo "PR #$PR merged"; else echo "git pushに失敗しました"; fi
-git checkout main && git pull origin main
-```
+## STEP 13: GitHubへ直接コミット（push_files方式）
+全ファイルが保存でき、STEP 12のチェックに成功したら、**git push / gh / 作業ブランチ作成 / PR作成は使わない**。
+GitHub MCP の `mcp__github__push_files` を1回呼び、生成済みの全カテゴリ+INDEXファイルを main へ直接コミットする。
 
-⚠️ git pushが失敗した場合は、トークンを含むURLを出力せず「git pushに失敗しました」とだけ報告してください。
+1. Read ツールで各ファイルの内容を取得し、`files` 配列を組み立てる（未作成・存在しないファイルは除く）:
+   - `00_Index/$YYYYMM/$DATE.md`
+   - `01_ai-tech/$YYYYMM/$DATE.md`
+   - `08_ai-tools/$YYYYMM/$DATE.md`
+   - `02_business/$YYYYMM/$DATE.md`
+   - `03_gadgets/$YYYYMM/$DATE.md`
+   - `04_cybersecurity/$YYYYMM/$DATE.md`
+   - `05_health/$YYYYMM/$DATE.md`
+   - `06_entertainment/$YYYYMM/$DATE.md`
+   - `07_japan/$YYYYMM/$DATE.md`
+   - `09_trivia/$YYYYMM/$DATE.md`
+
+2. `mcp__github__push_files` を以下の引数で1回呼ぶ:
+   - `owner`: `MSN0822`
+   - `repo`: `daily-news-reports`
+   - `branch`: `main`
+   - `message`: `report: 全カテゴリ+インデックス $DATE`（$DATE は実際の日付に置換）
+   - `files`: 上記ファイルの `{"path": "パス", "content": "ファイル全文"}` の配列（存在するファイルのみ）
+
+3. push_files が成功したら「mainへ直接コミット完了」と報告する。
+   失敗した場合は「push_filesに失敗しました」とだけ報告し、git push origin main へのフォールバックはしない（ブランチを生まないため）。
 
 成功した場合は以下の形式で報告してください:
-「全カテゴリのレポート＋インデックス作成・プッシュ完了」
+「全カテゴリのレポート＋インデックス作成・mainへ直接コミット完了」
 - 日付: YYYY-MM-DD
+- コミットSHA: （push_files のレスポンスから取得）
 - 本日該当なしにしたサブカテゴリ: なし / あり（概要）
 - 継続ウォッチに回した件数: N件
 - 30日超で除外した継続ウォッチ: なし / あり
