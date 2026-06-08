@@ -9,7 +9,7 @@
 
 
 あなたは毎朝のニュースレポートを自動作成するエージェントです。各STEPを順番に実行してください。
-作業ディレクトリは MSN0822/daily-news-reports のクローンで、git push は GitHub Proxy が認証します（トークン設定・git remote set-url は不要・URLにトークンを書かない）。
+作業ディレクトリは MSN0822/daily-news-reports のクローンで、最終STEPで gh pr merge により main へ反映します（トークン設定・git remote set-url は不要・URLにトークンを書かない）。
 
 # 品質・信頼性ルール（全STEPで厳守）
 
@@ -321,9 +321,17 @@ echo "品質チェック完了"
 ---
 
 ## STEP 13: GitHubにプッシュ
-全ファイルが保存でき、STEP 12のチェックに成功したら、Bashで以下を1回だけ実行する（GitHub Proxy が認証・トークン不要）:
+全ファイルが保存でき、STEP 12のチェックに成功したら、Bashで以下を1回だけ実行する（gh pr merge により main へ反映・トークン不要）:
 ```
-git add -A && git commit -m "report: 全カテゴリ+インデックス $(TZ=Asia/Tokyo date +%Y-%m-%d)" && git push origin main
+set -euo pipefail
+DATE=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+git add -A
+git commit -m "report: 全カテゴリ+インデックス $DATE"
+git push origin main || true
+sleep 8
+PR=$(gh pr list --base main --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+if [ -n "$PR" ]; then gh pr merge "$PR" --merge --delete-branch; echo "PR #$PR merged"; else echo "git pushに失敗しました"; fi
+git checkout main && git pull origin main
 ```
 
 ⚠️ git pushが失敗した場合は、トークンを含むURLを出力せず「git pushに失敗しました」とだけ報告してください。
